@@ -27,7 +27,7 @@ class GameAction(BaseModel):
 class Agent(Sprite):
     score: int = 0
 
-    def __init__(self, personality: str, move_delay: float = 5):
+    def __init__(self, personality: str, move_delay: float = 3):
         super().__init__(":resources:images/animated_characters/robot/robot_idle.png")
         self.prompt = PromptTemplate(
             template="{personality} \n {game_state} \n Respond with json and only json conforming to the following schema {format_instructions} \n What action you do next? {{",

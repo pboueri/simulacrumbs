@@ -29,7 +29,7 @@ classifiers = [  #! Update me
 
 [tool.poetry.scripts]
 # Entry points for the package https://python-poetry.org/docs/pyproject/#scripts
-"simulacrumbs" = "simulacrumbs.__main__:app"
+"simulacrumbs" = "simulacrumbs.cli:app"
 
 [tool.poetry.dependencies]
 python = "^3.9"
@@ -39,6 +39,8 @@ rich = "^10.14.0"
 langchain = "^0.0.115"
 pydantic = "^1.10.6"
 loguru = "^0.6.0"
+arcade = "^2.6.17"
+openai = "^0.27.2"
 
 [tool.poetry.dev-dependencies]
 bandit = "^1.7.1"

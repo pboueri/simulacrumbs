@@ -6,7 +6,7 @@ from arcade import Sprite
 from langchain.prompts import PromptTemplate
 from langchain.llms import OpenAI
 from langchain.chains import LLMChain
-from langchain.output_parsers import PydanticOutputParser
+from concurrent import futures
 
 from enum import Enum
 
@@ -42,6 +42,8 @@ class Agent(Sprite):
         self.game_state = ""
         self.last_move = time()
         self.move_delay = move_delay
+        self.thread_pool: futures.ThreadPoolExecutor = None
+        self.pending_action = None
 
     
     def update_personality(self, personality: str):
@@ -50,9 +52,11 @@ class Agent(Sprite):
     def update(self):
         if time() - self.last_move < self.move_delay:
             return
-        else:
+        elif self.pending_action is None:
+            self.pending_action = self.thread_pool.submit(self.next_action)
+        elif self.pending_action.done():
             self.last_move = time()
-            action = self.next_action(self.game_state)
+            action = self.pending_action.result()
             if action.action == Action.MOVE_LEFT:
                 self.center_x -= 10
             elif action.action == Action.MOVE_RIGHT:
@@ -65,11 +69,14 @@ class Agent(Sprite):
                 pass
             self.thought_history +=  "\n" + action.thought
             self.move_history += "\n" + action.action
+            self.pending_action = None
+        elif self.pending_action.running():
+            pass
 
-    def next_action(self, game_state: str) -> GameAction:
+    def next_action(self) -> GameAction:
         # TODO only provide valid moves
         try:
-            result = self.chain(game_state)
+            result = self.chain(self.game_state)
             result = "{" + result["text"] + "}"
             action = GameAction(**json.loads(result))
         except Exception as e:

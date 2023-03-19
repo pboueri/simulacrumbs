@@ -6,6 +6,7 @@ from arcade import gui
 import random
 
 from simulacrumbs.agents.base import Agent
+from concurrent import futures
 
 TEXT_WIDTH = 200
 SCREEN_WIDTH = 1600
@@ -18,6 +19,9 @@ class AgentGame(arcade.Window):
     def __init__(self, title, agents: List[Agent]) -> None:
         super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, title)
         self.agents = agents
+        self.thread_pool = futures.ThreadPoolExecutor(max_workers=3)
+        for agent in self.agents:
+            agent.thread_pool = self.thread_pool
         self.manager = gui.UIManager()
         self.manager.enable()
         # Create a chat area on the left side of the window that records agent thoughts

@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 import json
+from typing import Literal
 from time import time
 
 from arcade import Sprite
@@ -20,7 +21,7 @@ class Action(str, Enum):
 
 
 class GameAction(BaseModel):
-    action: Action
+    action: Literal[Action.MOVE_LEFT, Action.MOVE_RIGHT, Action.MOVE_UP, Action.MOVE_DOWN, Action.STAY]
     thought: str
 
 
@@ -37,14 +38,20 @@ class Agent(Sprite):
         self.personality = personality
         self.llm = OpenAI(model_name="curie", temperature=0.5, model_kwargs={"stop": ["}"]})
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt)
-        self.thought_history = ""
-        self.move_history = ""
+        self.past_actions = []
         self.game_state = ""
         self.last_move = time()
         self.move_delay = move_delay
         self.thread_pool: futures.ThreadPoolExecutor = None
         self.pending_action = None
 
+    @property
+    def thought_history(self):
+        return "\n".join([action.thought for action in self.past_actions])
+
+    @property
+    def action_history(self):
+        return "\n".join([action.action for action in self.past_actions])
     
     def update_personality(self, personality: str):
         self.prompt.partial_variables["personality"] = personality
@@ -67,8 +74,7 @@ class Agent(Sprite):
                 self.center_y -= 10
             elif action.action == Action.STAY:
                 pass
-            self.thought_history +=  "\n" + action.thought
-            self.move_history += "\n" + action.action
+            self.past_actions.append(action)
             self.pending_action = None
         elif self.pending_action.running():
             pass
@@ -80,6 +86,7 @@ class Agent(Sprite):
             result = "{" + result["text"] + "}"
             action = GameAction(**json.loads(result))
         except Exception as e:
+            print(result)
             action = GameAction(action=Action.STAY, thought="I don't know what to do")
         return action
 

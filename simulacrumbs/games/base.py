@@ -58,10 +58,15 @@ class AgentGame(arcade.Window):
     def update(self, delta_time: float):
         self.agent_list.update()
         for ix, agent in enumerate(self.agents):
-            agent.game_state = f"You are in a room at position ({agent.center_x},{agent.center_y}). There are {len(self.agents)-1} other Agents in the room"
+            agent.game_state = f"""
+You are in a room at position ({agent.center_x},{agent.center_y}).
+There are {len(self.agents)-1} other Agents in the room
+Your most recent action was {agent.past_actions[-1].action if len(agent.past_actions) > 0 else ''}
+Your most recent thought was "{agent.past_actions[-1].thought if len(agent.past_actions) > 0 else ''}"
+             """
             agent.update_personality(self.agent_prompts[ix].text)
             self.agent_thoughts[ix].text = THOUGHT_HISTORY + "\n" + agent.thought_history
-            self.agent_moves[ix].text = MOVE_HISTORY + "\n" + agent.move_history
+            self.agent_moves[ix].text = MOVE_HISTORY + "\n" + agent.action_history
         # Correct for any agents that have moved outside of the boundary
         for agent in self.agents:
             if agent.center_x < self.start_width:

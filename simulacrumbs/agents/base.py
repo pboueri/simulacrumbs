@@ -36,7 +36,7 @@ class Agent(Sprite):
             partial_variables={"format_instructions": GameAction.schema_json(), "personality": personality},
         )
         self.personality = personality
-        self.llm = OpenAI(model_name="curie", temperature=0.5, model_kwargs={"stop": ["}"]})
+        self.llm = OpenAI( temperature=0.5, model_kwargs={"stop": ["}"]})
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt)
         self.past_actions = []
         self.game_state = ""

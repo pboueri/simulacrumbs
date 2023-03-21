@@ -11,13 +11,13 @@ from concurrent import futures
 TEXT_WIDTH = 200
 SCREEN_WIDTH = 1600
 SCREEN_HEIGHT = 800
-THOUGHT_HISTORY = "These are agent thoughts:\n"
-MOVE_HISTORY = "These are the agents moves:\n"
+ACTION_HISTORY = "These are agent's last 5 actions:\n"
+
 
 # A pydantic BaseModel that keeps track of Game state including agents and actions
 class AgentGame(arcade.Window):
     def __init__(self, title, agents: List[Agent]) -> None:
-        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, title)
+        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, title, update_rate=1)
         self.agents = agents
         self.thread_pool = futures.ThreadPoolExecutor(max_workers=3)
         for agent in self.agents:
@@ -28,45 +28,61 @@ class AgentGame(arcade.Window):
         self.agent_thoughts = []
         self.agent_prompts = []
         self.agent_moves = []
-        for ix,agent in enumerate(agents):
+        for ix, agent in enumerate(agents):
             agent_thought = gui.UITextArea(
-                x=TEXT_WIDTH*ix, y=0, width=TEXT_WIDTH*(ix+1), height=300, text=THOUGHT_HISTORY, multiline=True, text_color=arcade.color.BLACK
-            )
-            agent_moves = gui.UITextArea(
-                x=TEXT_WIDTH*ix, y=300, width=TEXT_WIDTH*(ix+1), height=300, text=MOVE_HISTORY, multiline=True, text_color=arcade.color.BLACK
+                x=TEXT_WIDTH * ix,
+                y=0,
+                width=TEXT_WIDTH * (ix + 1),
+                height=600,
+                text=ACTION_HISTORY,
+                multiline=True,
+                text_color=arcade.color.BLACK,
             )
             agent_prompt = gui.UIInputText(
-                x=TEXT_WIDTH*ix, y=600, width=TEXT_WIDTH*(ix+1), height=200, text=agent.personality
+                x=TEXT_WIDTH * ix,
+                y=600,
+                width=TEXT_WIDTH * (ix + 1),
+                height=200,
+                text=agent.personality,
+                multiline=True,
+                text_color=arcade.color.BLACK,
             )
             self.manager.add(agent_thought)
             self.manager.add(agent_prompt)
-            self.manager.add(agent_moves)
             self.agent_thoughts.append(agent_thought)
             self.agent_prompts.append(agent_prompt)
-            self.agent_moves.append(agent_moves)
-            
-        self.start_width = TEXT_WIDTH*len(agents)
+
+        self.start_width = TEXT_WIDTH * len(agents)
         arcade.set_background_color(arcade.color.WHITE)
+        self.win = False
+        self.active_agents = []
 
     def setup(self):
         self.agent_list = arcade.SpriteList()
         for agent in self.agents:
-            agent.center_x = random.randrange(self.start_width, SCREEN_WIDTH)
-            agent.center_y = random.randrange(SCREEN_HEIGHT)
+            agent.center_x = random.randrange(self.start_width + 300, self.start_width + 600)
+            agent.center_y = random.randrange(200, 600)
         self.agent_list.extend(self.agents)
 
     def update(self, delta_time: float):
         self.agent_list.update()
+        if self.win:
+            print(f"Game OVER! Winning agent is {self.active_agents[0]}")
+            return
         for ix, agent in enumerate(self.agents):
             agent.game_state = f"""
-You are in a room at position ({agent.center_x},{agent.center_y}).
+You must be next to the other agent to speak to them.
+Their words can affect your own emotions deeply
 There are {len(self.agents)-1} other Agents in the room
+The other agents are  {[f"{agent.relative_position(a)}" for a in self.agents if a != agent]} away from you
 Your most recent action was {agent.past_actions[-1].action if len(agent.past_actions) > 0 else ''}
-Your most recent thought was "{agent.past_actions[-1].thought if len(agent.past_actions) > 0 else ''}"
+Your most recent thought was "{agent.past_actions[-1].thought if len(agent.past_actions) > 0 else ''}
+Your most recent emotion was {agent.past_actions[-1].your_emotion if len(agent.past_actions) > 0 else ''}"
              """
+            if agent.other_agent_speech != "":
+                agent.game_state += f"The other agent said '{agent.other_agent_speech}' it makes you feel a particular emotion\n"
             agent.update_personality(self.agent_prompts[ix].text)
-            self.agent_thoughts[ix].text = THOUGHT_HISTORY + "\n" + agent.thought_history
-            self.agent_moves[ix].text = MOVE_HISTORY + "\n" + agent.action_history
+            self.agent_thoughts[ix].text = ACTION_HISTORY + "\n" + agent.action_history
         # Correct for any agents that have moved outside of the boundary
         for agent in self.agents:
             if agent.center_x < self.start_width:
@@ -77,6 +93,14 @@ Your most recent thought was "{agent.past_actions[-1].thought if len(agent.past_
                 agent.center_y = 0
             if agent.center_y > SCREEN_HEIGHT:
                 agent.center_y = SCREEN_HEIGHT
+            for other_agent in self.agents:
+                if agent == other_agent:
+                    continue
+                if agent.relative_position(other_agent) == "same position":
+                    agent.other_agent_speech = agent.past_actions[-1].speak
+                agent.check_win(other_agent)
+        self.active_agents = [agent for agent in self.agents if not agent.lose]
+        self.win = len(self.active_agents) < 2
 
     def on_draw(self):
         self.clear()

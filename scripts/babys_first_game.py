@@ -1,75 +1,166 @@
+""" Sprite Sample Program """
+
 import arcade
 
-SCREEN_WIDTH = 640
-SCREEN_HEIGHT = 480
-MOVEMENT_SPEED = 3
+# --- Constants ---
+SPRITE_SCALING_BOX = 0.5
+SPRITE_SCALING_PLAYER = 0.5
 
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
 
-class Ball:
-    def __init__(self, position_x, position_y, change_x, change_y, radius, color):
-        # Take the parameters of the init function above,
-        # and create instance variables out of them.
-        self.position_x = position_x
-        self.position_y = position_y
-        self.change_x = change_x
-        self.change_y = change_y
-        self.radius = radius
-        self.color = color
-
-    def draw(self):
-        """Draw the balls with the instance variables we have."""
-        arcade.draw_circle_filled(self.position_x, self.position_y, self.radius, self.color)
-
-    def update(self):
-        # Move the ball
-        self.position_y += self.change_y
-        self.position_x += self.change_x
+MOVEMENT_SPEED = 10
+# How fast the camera pans to the player. 1.0 is instant.
+CAMERA_SPEED = 0.0000001
 
 
 class MyGame(arcade.Window):
-    def __init__(self, width, height, title):
-        # Call the parent class's init function
-        super().__init__(width, height, title)
+    """This class represents the main window of the game."""
 
-        # Make the mouse disappear when it is over the window.
-        # So we just see our object, not the pointer.
-        self.set_mouse_visible(False)
+    def __init__(self):
+        """Initializer"""
+        # Call the parent class initializer
+        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, "Sprite Example")
 
-        arcade.set_background_color(arcade.color.ASH_GREY)
+        # Sprite lists
+        self.player_list = None
+        self.wall_list = None
 
-        # Create our ball
-        self.ball = Ball(50, 50, 0, 0, 15, arcade.color.AUBURN)
+        # Set up the player
+        self.player_sprite = None
+
+        # This variable holds our simple "physics engine"
+        self.physics_engine = None
+
+        # Create the cameras. One for the GUI, one for the sprites.
+        # We scroll the 'sprite world' but not the GUI.
+        self.camera_for_sprites = arcade.Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
+        self.camera_for_gui = arcade.Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
+
+    def scroll_to_player(self):
+        """
+        Scroll the window to the player.
+
+        if CAMERA_SPEED is 1, the camera will immediately move to the desired position.
+        Anything between 0 and 1 will have the camera move to the location with a
+        smoother pan.
+        """
+
+        position = self.player_sprite.center_x - self.width / 2, self.player_sprite.center_y - self.height / 2
+        self.camera_for_sprites.move_to(position, CAMERA_SPEED)
+
+    def setup(self):
+        # Set the background color
+        arcade.set_background_color(arcade.color.AMAZON)
+
+        # Sprite lists
+        self.player_list = arcade.SpriteList()
+        self.wall_list = arcade.SpriteList()
+
+        # Reset the score
+        self.score = 0
+
+        # Create the player
+        self.player_sprite = arcade.Sprite("images/character.png", SPRITE_SCALING_PLAYER)
+        self.player_sprite.center_x = 50
+        self.player_sprite.center_y = 64
+        self.player_list.append(self.player_sprite)
+
+        # --- Manually place walls
+
+        # Manually create and position a box at 300, 200
+        wall = arcade.Sprite("images/boxCrate_double.png", SPRITE_SCALING_BOX)
+        wall.center_x = 300
+        wall.center_y = 200
+        self.wall_list.append(wall)
+
+        # Manually create and position a box at 364, 200
+        wall = arcade.Sprite("images/boxCrate_double.png", SPRITE_SCALING_BOX)
+        wall.center_x = 364
+        wall.center_y = 200
+        self.wall_list.append(wall)
+
+        # --- Place boxes inside a loop
+        for x in range(173, 650, 64):
+            wall = arcade.Sprite("images/boxCrate_double.png", SPRITE_SCALING_BOX)
+            wall.center_x = x
+            wall.center_y = 350
+            self.wall_list.append(wall)
+
+        # --- Place walls with a list
+        coordinate_list = [[400, 500], [470, 500], [400, 570], [470, 570]]
+
+        # Loop through coordinates
+        for coordinate in coordinate_list:
+            wall = arcade.Sprite("images/boxCrate_double.png", SPRITE_SCALING_BOX)
+            wall.center_x = coordinate[0]
+            wall.center_y = coordinate[1]
+            self.wall_list.append(wall)
+
+        # Create the physics engine. Give it a reference to the player, and
+        # the walls we can't run into.
+        self.physics_engine = arcade.PhysicsEngineSimple(self.player_sprite, self.wall_list)
 
     def on_draw(self):
-        """Called whenever we need to draw the window."""
         arcade.start_render()
-        self.ball.draw()
 
-    def update(self, delta_time):
-        self.ball.update()
+        # Select the scrolled camera for our sprites
+        self.camera_for_sprites.use()
+
+        # Draw the sprites
+        self.wall_list.draw()
+        self.player_list.draw()
+
+        # Select the (unscrolled) camera for our GUI
+        self.camera_for_gui.use()
+        arcade.draw_text(f"Score: {self.score}", 10, 10, arcade.color.WHITE, 24)
+
+    def on_update(self, delta_time):
+        """Movement and game logic"""
+
+        # Call update on all sprites (The sprites don't do much in this
+        # example though.)
+        self.physics_engine.update()
+
+        # Scroll the screen to the player
+        self.scroll_to_player()
+
+        # Scroll the window to the player.
+        #
+        # If CAMERA_SPEED is 1, the camera will immediately move to the desired position.
+        # Anything between 0 and 1 will have the camera move to the location with a smoother
+        # pan.
+        CAMERA_SPEED = 1
+        lower_left_corner = (self.player_sprite.center_x - self.width / 2, self.player_sprite.center_y - self.height / 2)
+        self.camera_for_sprites.move_to(lower_left_corner, CAMERA_SPEED)
 
     def on_key_press(self, key, modifiers):
-        """Called whenever the user presses a key."""
-        if key == arcade.key.LEFT:
-            self.ball.change_x = -MOVEMENT_SPEED
-        elif key == arcade.key.RIGHT:
-            self.ball.change_x = MOVEMENT_SPEED
-        elif key == arcade.key.UP:
-            self.ball.change_y = MOVEMENT_SPEED
+        """Called whenever a key is pressed."""
+
+        if key == arcade.key.UP:
+            self.player_sprite.change_y = MOVEMENT_SPEED
         elif key == arcade.key.DOWN:
-            self.ball.change_y = -MOVEMENT_SPEED
+            self.player_sprite.change_y = -MOVEMENT_SPEED
+        elif key == arcade.key.LEFT:
+            self.player_sprite.change_x = -MOVEMENT_SPEED
+        elif key == arcade.key.RIGHT:
+            self.player_sprite.change_x = MOVEMENT_SPEED
 
     def on_key_release(self, key, modifiers):
-        """Called whenever a user releases a key."""
-        if key == arcade.key.LEFT or key == arcade.key.RIGHT:
-            self.ball.change_x = 0
-        elif key == arcade.key.UP or key == arcade.key.DOWN:
-            self.ball.change_y = 0
+        """Called when the user releases a key."""
+
+        if key == arcade.key.UP or key == arcade.key.DOWN:
+            self.player_sprite.change_y = 0
+        elif key == arcade.key.LEFT or key == arcade.key.RIGHT:
+            self.player_sprite.change_x = 0
 
 
 def main():
-    window = MyGame(640, 480, "Drawing Example")
+    """Main method"""
+    window = MyGame()
+    window.setup()
     arcade.run()
 
 
-main()
+if __name__ == "__main__":
+    main()
